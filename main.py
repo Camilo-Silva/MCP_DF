@@ -1,6 +1,5 @@
-def main():
-    print("Hello from mcp-server-demo!")
-
+from server import mcp
 
 if __name__ == "__main__":
-    main()
+    # Ejecuta el servidor MCP usando el método .run() de FastMCP
+    mcp.run()
