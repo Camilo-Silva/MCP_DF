@@ -2,6 +2,7 @@ import httpx
 from prettytable import PrettyTable
 from server import mcp
 from utils.api_helpers import get_headers_with_db, API_BASE_URL
+from typing import List, Dict
 
 @mcp.tool()
 def consultar_stock_y_precios(
@@ -59,8 +60,8 @@ def consultar_stock_y_precios(
         # Crear tabla
         table = PrettyTable()
         table.field_names = [
-            "Artículo", "Descripción", "Color", "Cod.Color", "Talle", "Cod.Talle", 
-            "Stock", "Disponible", "Precio", "Lista"
+            "Artículo", "Descripción", "Cod.Color", "Color", "Cod.Talle" , "Talle",
+            "Stock", "Disponible", "Precio Lista1 (Público)", "Precio Lista3 (Oferta)"
         ]
         
         # Obtener resultados
@@ -74,29 +75,52 @@ def consultar_stock_y_precios(
             if articulo.get("Lista"):
                 listas_encontradas.add(articulo.get("Lista"))
         
-        # Llenar tabla
+        # Crear un diccionario para agrupar por artículo, color y talle
+        articulos_agrupados = {}
         for articulo in articulos:
+            key = (articulo.get("Articulo", ""), articulo.get("Color", ""), articulo.get("Talle", ""))
+            if key not in articulos_agrupados:
+                articulos_agrupados[key] = {
+                    "info": articulo,
+                    "precios": {}
+                }
+            
+            # Almacenar precios por lista
+            lista = articulo.get("Lista", "")
+            precio = articulo.get("Precio", 0)
+            articulos_agrupados[key]["precios"][lista] = precio
+        
+        # Llenar tabla
+        for key, data_item in articulos_agrupados.items():
+            articulo = data_item["info"]
+            precios = data_item["precios"]
+            
+            # Obtener precios de las diferentes listas
+            precio_lista1 = precios.get("LISTA1", 0)  # PUBLICO/ECOMMERCE
+            precio_oferta = precios.get("OFERTA ECOMMERCE", 0)  # LISTA3
+            
             table.add_row([
                 articulo.get("Articulo", ""),
-                articulo.get("ArticuloDescripcion", "")[:25] + "..." if len(articulo.get("ArticuloDescripcion", "")) > 25 else articulo.get("ArticuloDescripcion", ""),
+                articulo.get("ArticuloDescripcion", "")[:20] + "..." if len(articulo.get("ArticuloDescripcion", "")) > 20 else articulo.get("ArticuloDescripcion", ""),
                 articulo.get("ColorDescripcion", ""),
                 articulo.get("Color", ""),  # Código de color
                 articulo.get("TalleDescripcion", ""),
                 articulo.get("Talle", ""),  # Código de talle
                 articulo.get("Stock", 0),
                 articulo.get("Disponible", 0),
-                f"${articulo.get('Precio', 0)}",
-                articulo.get("Lista", "")
+                f"${precio_lista1}" if precio_lista1 > 0 else "-",
+                f"${precio_oferta}" if precio_oferta > 0 else "-"
             ])
         
         # Configurar la tabla
         table.align = "l"
         table.align["Stock"] = "r"
         table.align["Disponible"] = "r"
-        table.align["Precio"] = "r"
+        table.align["Precio Lista1 (Público)"] = "r"
+        table.align["Precio Lista3 (Oferta)"] = "r"
         
         total = data.get("TotalRegistros", 0)
-        mostrados = len(articulos)
+        mostrados = len(articulos_agrupados)
         
         resultado = "💰📦 **Consulta de Stock y Precios**\n\n"
         resultado += f"Total de registros: {total}, Mostrando: {mostrados}\n\n"
@@ -284,3 +308,88 @@ def consultar_articulos_sin_stock(
         
     except Exception as e:
         return f"Error al consultar artículos sin stock: {str(e)}"
+
+@mcp.tool()
+def obtener_datos_stock_y_precios(
+    limite: int | None = None,
+    query: str | None = None,
+    lista: str | None = None,
+    preciocero: bool | None = None,
+    stockcero: bool | None = None,
+    exacto: bool | None = None,
+    base_datos: str = "ECOMMECS"
+) -> List[Dict]:
+    """
+    Obtiene los datos de stock y precios en formato estructurado (lista de diccionarios).
+    
+    Args:
+        limite: Número máximo de registros a obtener (opcional)
+        query: Filtro de búsqueda por texto (opcional)
+        lista: Filtro por lista de precios específica (opcional)
+        preciocero: Incluir artículos con precio cero (opcional)
+        stockcero: Incluir artículos con stock cero (opcional)
+        exacto: Búsqueda exacta (opcional)
+        base_datos: Base de datos a consultar (por defecto ECOMMECS)
+    
+    Returns:
+        Lista de diccionarios con los datos de stock y precios
+    """
+    try:
+        # Obtener headers con la base de datos especificada
+        headers = get_headers_with_db(base_datos)
+            
+        url = f"{API_BASE_URL}/ConsultaStockYPrecios/"
+        
+        # Construir parámetros de la consulta
+        params = {}
+        
+        # Si se especifica un límite, lo usamos; si no, obtenemos muchos registros
+        params["limit"] = limite if limite else 5000
+        
+        # Agregar parámetros opcionales si se proporcionan
+        if query:
+            params["query"] = query
+        if lista:
+            params["lista"] = lista
+        if preciocero is not None:
+            params["preciocero"] = preciocero
+        if stockcero is not None:
+            params["stockcero"] = stockcero
+        if exacto is not None:
+            params["exacto"] = exacto
+        
+        response = httpx.get(url, headers=headers, params=params)
+        response.raise_for_status()
+        data = response.json()
+        
+        # Obtener resultados
+        articulos = data.get("Resultados", [])
+        if limite:
+            articulos = articulos[:limite]
+        
+        # Procesar y limpiar los datos para exportación
+        datos_procesados = []
+        for articulo in articulos:
+            dato = {
+                "Articulo": articulo.get("Articulo", ""),
+                "Descripcion": articulo.get("ArticuloDescripcion", ""),
+                "Codigo_Color": articulo.get("Color", ""),
+                "Color": articulo.get("ColorDescripcion", ""),
+                "Codigo_Talle": articulo.get("Talle", ""),
+                "Talle": articulo.get("TalleDescripcion", ""),                
+                "Stock": articulo.get("Stock", 0),
+                "Disponible": articulo.get("Disponible", 0),
+                "Comprometido": articulo.get("Comprometido", 0),
+                "Pendiente": articulo.get("PendienteEntrega", 0),
+                "Lista": articulo.get("Lista", ""),
+                "Precio": articulo.get("Precio", 0),
+                "Base_Datos": base_datos
+            }
+            datos_procesados.append(dato)
+        
+        return datos_procesados
+        
+    except Exception as e:
+        return [{"Error": f"Error al obtener datos de stock y precios: {str(e)}"}]
+
+

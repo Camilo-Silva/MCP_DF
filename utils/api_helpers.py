@@ -6,7 +6,7 @@ def get_headers_with_db(base_datos: str) -> dict:
     """
     return {
         "accept": "application/json",
-        "Authorization": JW_TOKEN,  # Sin "Bearer " porque parece que la API no lo requiere
+        "Authorization": JW_TOKEN, # Token JWT para autenticación
         "BaseDeDatos": base_datos,
         "IdCliente": ID_CLIENTE,
     }
