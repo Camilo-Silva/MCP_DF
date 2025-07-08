@@ -57,23 +57,30 @@ def consultar_stock_y_precios(
         response.raise_for_status()
         data = response.json()
         
-        # Crear tabla
-        table = PrettyTable()
-        table.field_names = [
-            "Artículo", "Descripción", "Cod.Color", "Color", "Cod.Talle" , "Talle",
-            "Stock", "Disponible", "Precio Lista1 (Público)", "Precio Lista3 (Oferta)"
-        ]
-        
         # Obtener resultados
         articulos = data.get("Resultados", [])
         if limite:
             articulos = articulos[:limite]
         
-        # Recopilar listas disponibles encontradas
-        listas_encontradas = set()
+        # Recopilar todas las listas de precios disponibles dinámicamente
+        listas_disponibles = set()
         for articulo in articulos:
-            if articulo.get("Lista"):
-                listas_encontradas.add(articulo.get("Lista"))
+            precios_articulo = articulo.get("Precios", [])
+            if precios_articulo and isinstance(precios_articulo, list):
+                for precio_info in precios_articulo:
+                    lista_nombre = precio_info.get("Lista", "")
+                    if lista_nombre:
+                        listas_disponibles.add(lista_nombre)
+        
+        # Convertir a lista ordenada para mantener consistencia
+        listas_ordenadas = sorted(listas_disponibles)
+        
+        # Crear tabla dinámica con columnas de precios según las listas encontradas
+        columnas_base = ["Artículo", "Descripción", "Cod.Color", "Color", "Cod.Talle", "Talle", "Stock", "Disponible"]
+        columnas_precios = [f"Precio {lista}" for lista in listas_ordenadas]
+        
+        table = PrettyTable()
+        table.field_names = columnas_base + columnas_precios
         
         # Crear un diccionario para agrupar por artículo, color y talle
         articulos_agrupados = {}
@@ -85,21 +92,22 @@ def consultar_stock_y_precios(
                     "precios": {}
                 }
             
-            # Almacenar precios por lista
-            lista = articulo.get("Lista", "")
-            precio = articulo.get("Precio", 0)
-            articulos_agrupados[key]["precios"][lista] = precio
+            # Procesar precios desde el array "Precios"
+            precios_articulo = articulo.get("Precios", [])
+            if precios_articulo and isinstance(precios_articulo, list):
+                for precio_info in precios_articulo:
+                    lista_nombre = precio_info.get("Lista", "")
+                    precio_valor = precio_info.get("Precio", 0)
+                    if lista_nombre:
+                        articulos_agrupados[key]["precios"][lista_nombre] = precio_valor
         
-        # Llenar tabla
+        # Llenar tabla dinámicamente
         for key, data_item in articulos_agrupados.items():
             articulo = data_item["info"]
             precios = data_item["precios"]
             
-            # Obtener precios de las diferentes listas
-            precio_lista1 = precios.get("LISTA1", 0)  # PUBLICO/ECOMMERCE
-            precio_oferta = precios.get("OFERTA ECOMMERCE", 0)  # LISTA3
-            
-            table.add_row([
+            # Datos base del artículo
+            fila_base = [
                 articulo.get("Articulo", ""),
                 articulo.get("ArticuloDescripcion", "")[:20] + "..." if len(articulo.get("ArticuloDescripcion", "")) > 20 else articulo.get("ArticuloDescripcion", ""),
                 articulo.get("ColorDescripcion", ""),
@@ -107,17 +115,25 @@ def consultar_stock_y_precios(
                 articulo.get("TalleDescripcion", ""),
                 articulo.get("Talle", ""),  # Código de talle
                 articulo.get("Stock", 0),
-                articulo.get("Disponible", 0),
-                f"${precio_lista1}" if precio_lista1 > 0 else "-",
-                f"${precio_oferta}" if precio_oferta > 0 else "-"
-            ])
+                articulo.get("Disponible", 0)
+            ]
+            
+            # Agregar precios dinámicamente según las listas encontradas
+            precios_fila = []
+            for lista in listas_ordenadas:
+                precio_valor = precios.get(lista, 0)
+                precios_fila.append(f"${precio_valor}" if precio_valor > 0 else "-")
+            
+            table.add_row(fila_base + precios_fila)
         
-        # Configurar la tabla
+        # Configurar alineación de la tabla
         table.align = "l"
         table.align["Stock"] = "r"
         table.align["Disponible"] = "r"
-        table.align["Precio Lista1 (Público)"] = "r"
-        table.align["Precio Lista3 (Oferta)"] = "r"
+        
+        # Alinear columnas de precios a la derecha
+        for lista in listas_ordenadas:
+            table.align[f"Precio {lista}"] = "r"
         
         total = data.get("TotalRegistros", 0)
         mostrados = len(articulos_agrupados)
@@ -127,8 +143,8 @@ def consultar_stock_y_precios(
         resultado += table.get_string()
         
         # Agregar información sobre las listas encontradas
-        if listas_encontradas:
-            resultado += f"\n\n📋 **Listas de Precios Encontradas:** {', '.join(sorted(listas_encontradas))}"
+        if listas_disponibles:
+            resultado += f"\n\n📋 **Listas de Precios Encontradas:** {', '.join(listas_ordenadas)}"
         
         return resultado
         
@@ -190,8 +206,23 @@ def consultar_stock_articulo_especifico(
         table = PrettyTable()
         table.field_names = [
             "Color", "Talle", "Stock", "Disponible", 
-            "Comprometido", "Pendiente", "Precio Principal"
+            "Comprometido", "Pendiente"
         ]
+        
+        # Detectar todas las listas de precios disponibles
+        listas_precios_disponibles = set()
+        for articulo in articulos_filtrados:
+            precios_articulo = articulo.get("Precios", [])
+            if precios_articulo and isinstance(precios_articulo, list):
+                for precio_info in precios_articulo:
+                    lista_nombre = precio_info.get("Lista", "")
+                    if lista_nombre:
+                        listas_precios_disponibles.add(lista_nombre)
+        
+        # Agregar columnas de precios dinámicamente
+        listas_ordenadas = sorted(listas_precios_disponibles)
+        for lista in listas_ordenadas:
+            table.field_names.append(f"Precio {lista}")
         
         total_stock = 0
         total_disponible = 0
@@ -202,36 +233,64 @@ def consultar_stock_articulo_especifico(
             total_stock += stock
             total_disponible += disponible
             
-            table.add_row([
+            # Datos base de la fila
+            fila_base = [
                 articulo.get("ColorDescripcion", ""),
                 articulo.get("TalleDescripcion", ""),
                 stock,
                 disponible,
                 articulo.get("Comprometido", 0),
-                articulo.get("PendienteEntrega", 0),
-                f"${articulo.get('Precio', 0)}"
-            ])
+                articulo.get("PendienteEntrega", 0)
+            ]
+            
+            # Agregar precios dinámicamente
+            precios_fila = []
+            precios_articulo = articulo.get("Precios", [])
+            precios_dict = {}
+            
+            if precios_articulo and isinstance(precios_articulo, list):
+                for precio_info in precios_articulo:
+                    lista_nombre = precio_info.get("Lista", "")
+                    precio_valor = precio_info.get("Precio", 0)
+                    if lista_nombre:
+                        precios_dict[lista_nombre] = precio_valor
+            
+            for lista in listas_ordenadas:
+                precio_valor = precios_dict.get(lista, 0)
+                precios_fila.append(f"${precio_valor}")
+            
+            table.add_row(fila_base + precios_fila)
         
-        # Configurar la tabla
+        # Configurar alineación de la tabla
         table.align = "l"
         table.align["Stock"] = "r"
         table.align["Disponible"] = "r"
         table.align["Comprometido"] = "r"
         table.align["Pendiente"] = "r"
-        table.align["Precio Principal"] = "r"
+        
+        # Alinear columnas de precios
+        for lista in listas_ordenadas:
+            table.align[f"Precio {lista}"] = "r"
         
         resultado += table.get_string()
-        resultado += f"\n\n**📊 Resumen Total:**\n"
+        resultado += "\n\n**📊 Resumen Total:**\n"
         resultado += f"- Stock total: {total_stock}\n"
         resultado += f"- Disponible total: {total_disponible}\n"
         resultado += f"- Combinaciones: {len(articulos_filtrados)}\n"
         
-        # Mostrar todas las listas de precios si están disponibles
-        if articulos_filtrados and articulos_filtrados[0].get("Precios"):
-            resultado += f"\n**💰 Listas de Precios Disponibles:**\n"
-            precios = articulos_filtrados[0].get("Precios", [])
-            for precio in precios:
-                resultado += f"- {precio.get('Lista', '')}: ${precio.get('Precio', 0)}\n"
+        # Mostrar todas las listas de precios disponibles dinámicamente
+        if listas_precios_disponibles:
+            resultado += "\n**💰 Listas de Precios Disponibles:**\n"
+            # Tomar el primer artículo para mostrar los precios como ejemplo
+            if articulos_filtrados:
+                primer_articulo = articulos_filtrados[0]
+                precios_articulo = primer_articulo.get("Precios", [])
+                if precios_articulo and isinstance(precios_articulo, list):
+                    for precio_info in precios_articulo:
+                        lista_nombre = precio_info.get("Lista", "")
+                        precio_valor = precio_info.get("Precio", 0)
+                        if lista_nombre:
+                            resultado += f"- {lista_nombre}: ${precio_valor}\n"
         
         return resultado
         
@@ -300,7 +359,7 @@ def consultar_articulos_sin_stock(
         total_original = data.get("TotalRegistros", 0)
         mostrados = len(articulos_sin_stock)
         
-        resultado = f"🚫📦 **Artículos Sin Stock**\n\n"
+        resultado = "🚫📦 **Artículos Sin Stock**\n\n"
         resultado += f"Total sin stock encontrados: {mostrados} (de {total_original} registros consultados)\n\n"
         resultado += table.get_string()
         
@@ -370,6 +429,7 @@ def obtener_datos_stock_y_precios(
         # Procesar y limpiar los datos para exportación
         datos_procesados = []
         for articulo in articulos:
+            # Datos base del artículo
             dato = {
                 "Articulo": articulo.get("Articulo", ""),
                 "Descripcion": articulo.get("ArticuloDescripcion", ""),
@@ -381,10 +441,31 @@ def obtener_datos_stock_y_precios(
                 "Disponible": articulo.get("Disponible", 0),
                 "Comprometido": articulo.get("Comprometido", 0),
                 "Pendiente": articulo.get("PendienteEntrega", 0),
-                "Lista": articulo.get("Lista", ""),
-                "Precio": articulo.get("Precio", 0),
                 "Base_Datos": base_datos
             }
+            
+            # Procesar precios dinámicamente desde el array "Precios"
+            precios_articulo = articulo.get("Precios", [])
+            primera_lista_procesada = False
+            
+            if precios_articulo and isinstance(precios_articulo, list):
+                for precio_info in precios_articulo:
+                    lista_nombre = precio_info.get("Lista", "")
+                    precio_valor = precio_info.get("Precio", 0)
+                    if lista_nombre:
+                        # Agregar cada precio como una columna separada
+                        dato[f"Precio_{lista_nombre}"] = precio_valor
+                        # Mantener compatibilidad con el primer precio encontrado
+                        if not primera_lista_procesada:
+                            dato["Lista"] = lista_nombre
+                            dato["Precio"] = precio_valor
+                            primera_lista_procesada = True
+            
+            # Fallback para casos donde no hay array "Precios" o está vacío
+            if not primera_lista_procesada:
+                dato["Lista"] = articulo.get("Lista", "")
+                dato["Precio"] = articulo.get("Precio", 0)
+            
             datos_procesados.append(dato)
         
         return datos_procesados
