@@ -1,142 +1,86 @@
-# MCP Server Demo - Dragonfish API
+# Servidor MCP para API Dragonfish
 
-Este proyecto es una demostración de un servidor MCP (Model Context Protocol) que integra con la API de Dragonfish para consultar y mostrar información sobre artículos, familias, stock, colores y talles, con la capacidad de especificar la base de datos por consulta.
+Este proyecto implementa un servidor MCP (Model Context Protocol) que se integra con la API de Dragonfish. Permite realizar consultas sobre artículos, stock, precios, y más, directamente desde un entorno compatible con MCP como Claude.
 
-## Características
+## Características Principales
 
-- Integración con API de Dragonfish basada en Swagger
-- Herramientas MCP para consultar:
-  - Artículos
-  - Artículos con información de familia
-  - Stock de un artículo específico
-  - Detalle de un artículo
-  - Colores disponibles
-  - Talles disponibles
-  - Familias de artículos
-  - Bases de datos disponibles
-  - Stock total de todos los artículos
-- Todas las herramientas soportan la especificación de base de datos
-- Formateo de salida en tablas para Claude Desktop
+- **Integración con Dragonfish**: Utiliza un archivo `swagger.json` para interactuar con la API de Dragonfish de forma estructurada.
+- **Herramientas MCP**: Provee un conjunto de herramientas para consultar información de la API:
+  - Listado de artículos con descripciones.
+  - Listado de artículos con detalles de familia y tipo.
+  - Consulta de stock y precios para un artículo específico.
+  - Obtención de detalles completos de un artículo.
+  - Listado de colores, talles y familias disponibles.
+  - Consulta de artículos sin stock.
+  - Consulta general de stock y precios con filtros.
+  - Exportación de resultados a formato Excel.
+- **Selección de Base de Datos**: La mayoría de las herramientas permiten especificar la base de datos (`ECOMMECS`, `TANGO`, etc.) en cada consulta.
+- **Salida Formateada**: Las respuestas se presentan en tablas bien formateadas para una fácil lectura en consolas o clientes de chat.
 
-## Opciones de Demostración
+## Requisitos Previos
 
-Este proyecto ofrece tres modos diferentes para probar las herramientas MCP:
+- Python 3.8 o superior.
+- Git.
 
-1. **Servidor MCP para Claude Desktop**
-   - Permite usar las herramientas directamente desde Claude Desktop
-   - Requiere configuración de Claude Desktop
+## Configuración del Entorno
 
-2. **Cliente de Línea de Comandos**
-   - Interfaz sencilla para probar desde la terminal
-   - No requiere configuración adicional
+1.  **Clonar el Repositorio**:
+    ```bash
+    git clone <URL-del-repositorio>
+    cd mcp-server-demo
+    ```
 
-3. **Servidor Web**
-   - Interfaz web para probar desde cualquier navegador o chat
-   - Incluye documentación API automática con OpenAPI
+2.  **Crear un Entorno Virtual** (recomendado):
+    ```bash
+    python -m venv .venv
+    source .venv/bin/activate  # En Windows: .\.venv\Scripts\activate
+    ```
 
-## Requisitos
+3.  **Instalar Dependencias**:
+    ```bash
+    pip install -r requirements.txt
+    ```
 
-- Python 3.8 o superior
-- Paquetes Python:
-  - fastmcp
-  - httpx
-  - pandas
-  - tabulate
-  - prettytable
-  - fastapi (para servidor web)
-  - uvicorn (para servidor web)
+4.  **Configurar Variables de Entorno**:
+    Crea un archivo llamado `.env` en la raíz del proyecto. Este archivo **no** será subido a Git gracias al `.gitignore`. Añade las siguientes variables con tus credenciales:
 
-## Inicio Rápido
+    ```ini
+    # URL base de la API de Dragonfish
+    API_BASE_URL=http://tu-servidor-dragonfish/api.Dragonfish
 
-### Usando PowerShell (Windows)
+    # Credenciales de la API
+    ID_CLIENTE=TU_ID_CLIENTE
+    JW_TOKEN=TU_TOKEN_JWT
+    ```
 
-El script `Demo-MCP.ps1` permite ejecutar cualquiera de los modos de demostración:
+## Uso
 
-```powershell
-# Instalar dependencias e iniciar cliente CLI
-.\Demo-MCP.ps1 -Mode cli -InstallDeps
-
-# Iniciar servidor web
-.\Demo-MCP.ps1 -Mode web
-
-# Iniciar ambos (servidor web y cliente CLI)
-.\Demo-MCP.ps1 -Mode all
-```
-
-### Manual (Cualquier Sistema Operativo)
-
-1. Instalar dependencias:
-   ```
-   pip install -r requirements.txt
-   ```
-
-2. Para usar con Claude Desktop:
-   ```
-   python server.py
-   ```
-
-3. Para cliente de línea de comandos:
-   ```
-   # En una terminal, iniciar el servidor MCP
-   python server.py
-   
-   # En otra terminal, usar el cliente CLI
-   python cli_demo.py
-   ```
-
-4. Para servidor web:
-   ```
-   # En una terminal, iniciar el servidor MCP
-   python server.py
-   
-   # En otra terminal, iniciar el servidor web
-   python web_demo.py
-   ```
-
-## Documentación Detallada
-
-- [README_WEB_DEMO.md](README_WEB_DEMO.md) - Información detallada sobre el servidor web de demostración
-
-## Ejemplos de Uso
-
-### Claude Desktop
-
-```python
-listar_articulos(limite=10, base_datos="ECOMMECS")
-listar_articulos_con_familia(limite=5, base_datos="ECOMMECS")
-listar_stock_articulo(codigo_articulo="1001", base_datos="ECOMMECS")
-obtener_detalle_articulo(codigo="1001", base_datos="ECOMMECS")
-listar_colores()
-listar_talles()
-listar_familias()
-listar_bases_datos()
-listar_stock_todos_articulos(limite=10, base_datos="ECOMMECS")
-```
-
-### Cliente CLI
+Para iniciar el servidor MCP, ejecuta el siguiente comando desde la raíz del proyecto:
 
 ```bash
-python cli_demo.py listar_articulos --limite 10 --base_datos ECOMMECS
-python cli_demo.py listar_stock_articulo --codigo_articulo 1001 --base_datos ECOMMECS
-python cli_demo.py obtener_detalle_articulo --codigo 1001 --base_datos ECOMMECS
-python cli_demo.py listar_stock_todos_articulos --limite 10 --base_datos ECOMMECS
-python cli_demo.py listar_bases_datos
+python main.py
 ```
 
-### Servidor Web
+El servidor comenzará a escuchar peticiones MCP. Ahora puedes conectarlo a tu cliente compatible (como Claude Desktop) y empezar a usar las herramientas.
 
-Navega a `http://localhost:8080` para ver la interfaz web, o usa los endpoints directamente:
+## Referencia de Herramientas (Funciones)
 
+Aquí hay una lista de las funciones disponibles a través de MCP:
+
+- `listar_articulos(limite, base_datos)`
+- `listar_articulos_con_familia(limite, base_datos)`
+- `consultar_stock_articulo_especifico(codigo_articulo, base_datos)`
+- `obtener_detalle_articulo(codigo, base_datos)`
+- `listar_colores(base_datos)`
+- `listar_talles(base_datos)`
+- `listar_familias(base_datos)`
+- `consultar_articulos_sin_stock(limite, base_datos)`
+- `consultar_stock_y_precios(limite, query, lista, preciocero, stockcero, exacto, base_datos)`
+- `exportar_datos_a_excel(data, nombre_archivo, nombre_hoja, incluir_resumen, columnas_numericas)`
+
+### Ejemplo de Invocación
+
+```python
+# Ejemplo de cómo se invocaría una herramienta desde un cliente MCP
+consultar_stock_articulo_especifico(codigo_articulo="XYZ123", base_datos="ECOMMECS")
 ```
-http://localhost:8080/api/listar_articulos?limite=10&base_datos=ECOMMECS
-http://localhost:8080/api/listar_stock_articulo?codigo_articulo=1001&base_datos=ECOMMECS
-http://localhost:8080/api/obtener_detalle_articulo?codigo=1001&base_datos=ECOMMECS
-http://localhost:8080/api/listar_stock_todos_articulos?limite=10&base_datos=ECOMMECS
-http://localhost:8080/api/listar_bases_datos
-```
-
-## Notas
-
-- Este es un proyecto de demostración y no está destinado para uso en producción.
-- El servidor web temporal no incluye autenticación ni otras medidas de seguridad.
-- Las salidas están formateadas para ser legibles tanto en terminales como en interfaces de chat como Claude Desktop.
