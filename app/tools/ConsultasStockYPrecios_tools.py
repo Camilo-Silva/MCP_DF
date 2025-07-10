@@ -382,6 +382,7 @@ def procesar_articulo_para_exportacion(articulo, base_datos):
         "Comprometido": articulo.get("Comprometido", 0),
         "Pendiente": articulo.get("PendienteEntrega", 0),
         "Base_Datos": base_datos
+        
     }
     precios_articulo = articulo.get("Precios", [])
     if precios_articulo and isinstance(precios_articulo, list):
