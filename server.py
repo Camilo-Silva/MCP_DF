@@ -14,7 +14,7 @@ mcp = FastMCP(
 # Simplemente importando los módulos de herramientas, las funciones decoradas con @mcp.tool()
 # se registrarán automáticamente en la instancia 'mcp'.
 # Esto hace que agregar nuevos grupos de herramientas sea tan fácil como agregar una nueva línea de importación.
-from app.tools import articulos_tools, colores_tools, talles_tools, ConsultasStockYPrecios_tools
+from app.tools import articulos_tools, colores_tools, talles_tools, ConsultasStockYPrecios_tools, tipificaciones_artículos_tools
 from utils import exportar_a_excel_tools
 
 # La lógica para ejecutar el servidor (if __name__ == "__main__":) se ha movido a main.py
