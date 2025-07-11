@@ -3,7 +3,7 @@ from prettytable import PrettyTable
 from server import mcp
 from utils.api_helpers import get_headers_with_db, API_BASE_URL
 from typing import List, Dict
-from app.resources.ConsultasStockYPrecios_resources import (
+from app.resources.consultas_stock_y_precios_resources import (
     crear_parametros_consulta,
     extraer_listas_precios,
     agrupar_articulos,
